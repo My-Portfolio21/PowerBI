@@ -1,0 +1,47 @@
+import boto3
+import os
+from datetime import datetime, timedelta
+
+# Initialize S3 and SNS clients
+s3_client = boto3.client('s3')
+sns_client = boto3.client('sns')
+
+def calculate_folder_size(bucket_name, folder_path):
+    total_size = 0
+    
+    # List objects in the specified folder
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=folder_path)
+    
+    # Calculate total size of objects in the folder
+    for obj in response.get('Contents', []):
+        total_size += obj['Size']
+    
+    return total_size
+
+def lambda_handler(event, context):
+    bucket_name = 'amzs3edhdev'
+    current_time = datetime.now()
+    
+    # Define the file patterns and corresponding subfolders
+    file_patterns = {
+        'ac_tcoarchivewebtrackinglog': 'raw/ac/tcoarchivewebtrackinglog',
+        'ecm_auth_employee': 'raw/ecm/auth_employee',
+        'edw_ecptrhst': 'raw/edw/ecptrhst'
+    }
+    
+    for file_pattern, subfolder in file_patterns.items():
+        file_name = f'{file_pattern}_{current_time.strftime("%Y%m%d%H%M%S")}.csv'
+        file_path = f'{subfolder}/{file_name}'
+        
+        # Check if the file was just created in S3
+        if event.get('Records', [])[0]['eventName'] == 'ObjectCreated:Put' and event['Records'][0]['s3']['object']['key'] == file_path:
+            # Calculate folder size
+            total_size = calculate_folder_size(bucket_name, subfolder)
+            
+            # Check if the total size is not within the specified range
+            if total_size < 500 * 1024 * 1024 or total_size > 1500 * 1024 * 1024:
+                # Trigger SNS notification
+                sns_client.publish(
+                    TopicArn='YOUR_SNS_TOPIC_ARN',
+                    Message=f'Total size of {subfolder} is not in the range of 0.5 GB to 1.5 GB. Current size: {total_size} bytes'
+                )
