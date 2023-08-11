@@ -1,61 +1,37 @@
 import boto3
-import json
+import os
+
+s3 = boto3.client('s3')
+sns = boto3.client('sns')
+
+# Define the threshold sizes for each parent folder
+threshold_sizes = {'ac': (100, 200), 'ecm': (150, 250), 'edw': (50, 150)}
 
 def lambda_handler(event, context):
-    s3_client = boto3.client('s3')
-    sns_client = boto3.client('sns')
-    lambda_response = {
-        "statusCode": 200,
-        "body": json.dumps("Lambda function executed successfully.")
+    # Extract bucket and key from the S3 event
+    bucket = event['Records'][0]['s3']['bucket']['name']
+    key = event['Records'][0]['s3']['object']['key']
+    
+    # Extract the subfolder name
+    subfolder = os.path.dirname(key).split('/')[-1]
+    
+    # Get the parent folder
+    parent_folder = os.path.dirname(key).split('/')[-2]
+    
+    # Get the sizes of parent folders
+    folder_sizes = {'ac': 0, 'ecm': 0, 'edw': 0}
+    # Calculate sizes here and update folder_sizes dictionary
+    
+    # Check if the size is outside the range
+    min_threshold, max_threshold = threshold_sizes[parent_folder]
+    if folder_sizes[parent_folder] < min_threshold or folder_sizes[parent_folder] > max_threshold:
+        sns.publish(
+            TopicArn='YOUR_SNS_TOPIC_ARN',
+            Subject=f'Folder Size Alert: {parent_folder}',
+            Message=f'The size of {parent_folder} is not within the desired range.'
+        )
+
+    return {
+        'statusCode': 200,
+        'body': 'Lambda function executed successfully'
     }
-
-    folder_thresholds = {
-        'ac': 100 * 1024 * 1024,  # 100 MB in bytes
-        'ecm': 200 * 1024 * 1024, # 200 MB in bytes
-        'edw': 300 * 1024 * 1024  # 300 MB in bytes
-    }
-
-    folder_sizes = {
-        'ac': 0,
-        'ecm': 0,
-        'edw': 0
-    }
-
-    for record in event['Records']:
-        bucket_name = record['s3']['bucket']['name']
-        object_key = record['s3']['object']['key']
-
-        if object_key.startswith('raw/ac/tcoarchivewebtrackinglog'):
-            folder_key = 'ac'
-        elif object_key.startswith('raw/ecm/auth_employee'):
-            folder_key = 'ecm'
-        elif object_key.startswith('raw/edw/ecptrhst'):
-            folder_key = 'edw'
-        else:
-            # Object is not in the specified subfolders
-            continue
-
-        # Get the object's size
-        response = s3_client.head_object(Bucket=bucket_name, Key=object_key)
-        object_size = response['ContentLength']
-
-        # Update folder size
-        folder_sizes[folder_key] += object_size
-
-        # Check if size exceeds threshold
-        if folder_sizes[folder_key] > folder_thresholds[folder_key]:
-            sns_message = f"Maximum size breached for '{folder_key}'. Current size: {folder_sizes[folder_key]} bytes"
-            sns_subject = f"Size Breach Alert - {folder_key}"
-            sns_client.publish(
-                TopicArn='YOUR_SNS_TOPIC_ARN',
-                Message=sns_message,
-                Subject=sns_subject
-            )
-
-        # Perform your desired actions here
-        print(f"New file created: s3://{bucket_name}/{object_key}")
-        print(f"Size of '{folder_key}': {folder_sizes[folder_key]} bytes")
-
-        # You can put your processing logic here
-
-    return lambda_response
