@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Specify the S3 bucket and subfolders
+S3_BUCKET="amzs3edhdev"
+SUBFOLDERS=("ac" "ecm" "edw")
+DUMMY_SUBFOLDER="confirmation"
+
+# Specify the expected timestamp format in the file names
+EXPECTED_TIMESTAMP=$(date +"%Y-%m-%d")
+
+# Initialize counters
+TOTAL_EXPECTED_COUNT=0
+TOTAL_ACTUAL_COUNT=0
+
+# Loop through each subfolder
+for SUBFOLDER in "${SUBFOLDERS[@]}"; do
+    # Get the list of files in the subfolder
+    FILE_LIST=$(aws s3 ls s3://$S3_BUCKET/$SUBFOLDER/ | awk '{print $4}')
+    
+    # Initialize subfolder counters
+    EXPECTED_COUNT=0
+    ACTUAL_COUNT=0
+    
+    # Loop through the list of files
+    for FILE in $FILE_LIST; do
+        # Check if the file name contains the expected timestamp
+        if [[ $FILE =~ $EXPECTED_TIMESTAMP ]]; then
+            EXPECTED_COUNT=$((EXPECTED_COUNT + 1))
+            
+            # Extract the timestamp from the filename (modify as per your naming convention)
+            FILE_TIMESTAMP=$(echo $FILE | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            
+            # Get the object metadata to check the timestamp tag
+            TAG=$(aws s3api head-object --bucket $S3_BUCKET --key $SUBFOLDER/$FILE --query 'TagSet[?Key==`Timestamp`].Value' --output text)
+            
+            # Compare timestamps and tags
+            if [[ $FILE_TIMESTAMP == $TAG ]]; then
+                ACTUAL_COUNT=$((ACTUAL_COUNT + 1))
+            fi
+        fi
+    done
+    
+    # Update the total counters
+    TOTAL_EXPECTED_COUNT=$((TOTAL_EXPECTED_COUNT + EXPECTED_COUNT))
+    TOTAL_ACTUAL_COUNT=$((TOTAL_ACTUAL_COUNT + ACTUAL_COUNT))
+    
+    echo "Subfolder '$SUBFOLDER' validation:"
+    echo "  Expected count: $EXPECTED_COUNT"
+    echo "  Actual count:   $ACTUAL_COUNT"
+done
+
+# Perform overall validation checks
+if [[ $TOTAL_ACTUAL_COUNT == $TOTAL_EXPECTED_COUNT ]]; then
+    echo "Overall data load validation successful. All $TOTAL_EXPECTED_COUNT files validated."
+    
+    # Create a confirmation dummy file
+    CONFIRMATION_FILE="$EXPECTED_TIMESTAMP.confirmation.dummy"
+    touch "$CONFIRMATION_FILE"
+    
+    # Upload the confirmation file to the dummy subfolder
+    aws s3 cp "$CONFIRMATION_FILE" "s3://$S3_BUCKET/$DUMMY_SUBFOLDER/"
+    
+    echo "Confirmation file '$CONFIRMATION_FILE' created and uploaded to '$DUMMY_SUBFOLDER'."
+else
+    echo "Overall data load validation failed. Expected $TOTAL_EXPECTED_COUNT files but found $TOTAL_ACTUAL_COUNT files."
+    # Add alerting or retry logic here
+fi
