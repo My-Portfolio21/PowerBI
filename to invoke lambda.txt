@@ -1,0 +1,31 @@
+# to invoke lambda
+
+#!/bin/bash
+
+# Specify the S3 bucket and subfolders
+S3_BUCKET="amzs3edhdev"
+SUBFOLDERS=("ac" "ecm" "edw")
+DUMMY_SUBFOLDER="confirmation"
+LAMBDA_FUNCTION_NAME="YourLambdaFunctionName"
+
+# ... (rest of the script)
+
+# Perform overall validation checks
+if [[ $TOTAL_ACTUAL_COUNT == $TOTAL_EXPECTED_COUNT ]]; then
+    echo "Overall data load validation successful. All $TOTAL_EXPECTED_COUNT files validated."
+    
+    # Create a confirmation dummy file
+    CONFIRMATION_FILE="$EXPECTED_TIMESTAMP.confirmation.dummy"
+    touch "$CONFIRMATION_FILE"
+    
+    # Upload the confirmation file to the dummy subfolder
+    aws s3 cp "$CONFIRMATION_FILE" "s3://$S3_BUCKET/$DUMMY_SUBFOLDER/"
+    
+    echo "Confirmation file '$CONFIRMATION_FILE' created and uploaded to '$DUMMY_SUBFOLDER'."
+
+    # Trigger AWS Lambda function
+    aws lambda invoke --function-name "$LAMBDA_FUNCTION_NAME" --payload '{"message": "Validation successful"}' output.txt
+    echo "AWS Lambda function '$LAMBDA_FUNCTION_NAME' triggered."
+else
+    # ... (rest of the error handling)
+fi

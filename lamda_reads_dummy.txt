@@ -1,0 +1,51 @@
+import boto3
+import os
+
+def lambda_handler(event, context):
+    # Initialize AWS clients
+    s3_client = boto3.client('s3')
+    sns_client = boto3.client('sns')
+
+    # Read the contents of the dummy file
+    bucket_name = 'amzs3edhdev'
+    dummy_file_key = 'confirmation.dummy'
+    
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=dummy_file_key)
+        dummy_content = response['Body'].read().decode('utf-8')
+    except Exception as e:
+        print(f"Error reading dummy file: {e}")
+        return
+    
+    # Extract keywords from the dummy content
+    keywords = dummy_content.split()
+    
+    # Define subfolders and their corresponding keywords
+    subfolders = {'ac': 'ac', 'ecm': 'ecm', 'edw': 'edw'}
+    
+    for subfolder, keyword in subfolders.items():
+        if keyword in keywords:
+            # Calculate the size of the subfolder
+            subfolder_size = calculate_subfolder_size(bucket_name, subfolder, s3_client)
+            
+            if subfolder_size > 100 * 1024 * 1024:  # 100 MB in bytes
+                # Trigger SNS notification
+                topic_arn = 'arn:aws:sns:us-east-1:123456789012:MyTopic'  # Replace with your SNS topic ARN
+                sns_message = f"Size of {subfolder} subfolder exceeded 100 MB."
+                
+                try:
+                    sns_client.publish(TopicArn=topic_arn, Message=sns_message)
+                    print(f"SNS notification sent for {subfolder} subfolder.")
+                except Exception as e:
+                    print(f"Error sending SNS notification: {e}")
+
+def calculate_subfolder_size(bucket_name, subfolder, s3_client):
+    total_size = 0
+    
+    # List objects in the subfolder
+    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=subfolder)
+    
+    for obj in response.get('Contents', []):
+        total_size += obj['Size']
+    
+    return total_size
