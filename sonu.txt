@@ -1,38 +1,30 @@
 import boto3
 
-s3 = boto3.client('s3')
-sns = boto3.client('sns')
-
-def get_parent_folder(key):
-    # Split the key into parts using the delimiter '/'
-    key_parts = key.split('/')
-    
-    # The second-to-last part will be the parent folder
-    parent_folder = key_parts[-2]
-    
-    return parent_folder
-
 def lambda_handler(event, context):
-    # Extract bucket and key from the S3 event
-    bucket = event['Records'][0]['s3']['bucket']['name']
-    key = event['Records'][0]['s3']['object']['key']
+    s3 = boto3.client('s3')
+    sns = boto3.client('sns')
     
-    # Extract the parent folder name
-    parent_folder = get_parent_folder(key)
+    bucket_name = event['Records'][0]['s3']['bucket']['name']
+    folder_name = event['Records'][0]['s3']['object']['key'].split('/')[1]
     
-    # Get the sizes of parent folders
-    folder_sizes = {'ac': 0, 'ecm': 0, 'edw': 0}
-    # Calculate sizes here and update folder_sizes dictionary
+    total_size = 0
+    objects = s3.list_objects_v2(Bucket=bucket_name, Prefix=f'raw/{folder_name}/')['Contents']
     
-    # Check if the size is outside the range
-    if folder_sizes[parent_folder] < 100 or folder_sizes[parent_folder] > 200:
-        sns.publish(
-            TopicArn='YOUR_SNS_TOPIC_ARN',
-            Subject=f'Folder Size Alert: {parent_folder}',
-            Message=f'The size of {parent_folder} is not within the desired range.'
-        )
-
-    return {
-        'statusCode': 200,
-        'body': 'Lambda function executed successfully'
-    }
+    for obj in objects:
+        total_size += obj['Size']
+    
+    if folder_name == 'ac':
+        threshold_min = 100 * 1024 * 1024  # 100MB
+        threshold_max = 200 * 1024 * 1024  # 200MB
+    elif folder_name == 'ecm':
+        threshold_min = 200 * 1024 * 1024  # 200MB
+        threshold_max = 300 * 1024 * 1024  # 300MB
+    elif folder_name == 'edw':
+        threshold_min = 300 * 1024 * 1024  # 300MB
+        threshold_max = 400 * 1024 * 1024  # 400MB
+    else:
+        return  # Exit if folder_name is not recognized
+    
+    if total_size < threshold_min or total_size > threshold_max:
+        message = f'Total size of {folder_name} is above threshold. Total size: {total_size} bytes.'
+        sns.publish(TopicArn='your-sns-topic-arn', Message=message)
