@@ -1,1 +1,14 @@
-aws s3api list-objects-v2 --bucket your-bucket-name --prefix ac/ --query 'reverse(sort_by(Contents, &LastModified))[0].Key' --output text | cut -d'/' -f2
+{
+    "Version": "2012-10-17",
+    "Id": "LambdaFunctionAccessPolicy",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "lambda.amazonaws.com"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::your-bucket-name/*"
+        }
+    ]
+}
