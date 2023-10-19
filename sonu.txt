@@ -1,35 +1,14 @@
-import boto3
-import csv
-from io import StringIO
-
-# AWS credentials (Note: It's recommended to use IAM roles or environment variables for credentials)
-aws_access_key = 'YOUR_ACCESS_KEY'
-aws_secret_key = 'YOUR_SECRET_KEY'
-
-# S3 information
-bucket_name = 'amzs3edhqa'
-input_file_key = 'backup_2023/customer_device_fact_QANEW/input.csv'
-output_file_key = 'backup_2023/customer_device_fact_QANEW/output.csv'
-
-# Connect to S3
-s3 = boto3.client('s3', aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
-
-# Read data from S3
-response = s3.get_object(Bucket=bucket_name, Key=input_file_key)
-data = response['Body'].read().decode('utf-8')
-
-# Process data and add quotes
-output_data = []
-reader = csv.reader(data.splitlines())
-for row in reader:
-    modified_row = [f'"{field}"' if ',' in field else field for field in row]
-    output_data.append(','.join(modified_row))
-
-# Prepare data for writing
-output_data_str = '\n'.join(output_data)
-output_data_bytes = output_data_str.encode('utf-8')
-
-# Write modified data back to S3
-s3.put_object(Bucket=bucket_name, Key=output_file_key, Body=output_data_bytes)
-
-print("Quotes added and data written to S3.")
+SELECT
+    w.query,
+    w.queue_start_time,
+    w.service_class,
+    w.total_exec_time,
+    s.service_class,
+    s.total_exec_time AS total_exec_time_stuck,
+    s.wait_event
+FROM stl_wlm_query w
+JOIN stl_wlm_query_state s
+ON w.query = s.query
+WHERE w.status = 'Aborted'
+AND s.queue_start_time < (GETDATE() - INTERVAL '1 hour')
+AND w.pid = <Your_PID>;
