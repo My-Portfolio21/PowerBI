@@ -1,4 +1,4 @@
-SELECT 
+SELECT
   l.locktype,
   l.database,
   l.relation::regclass,
