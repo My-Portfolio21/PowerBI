@@ -1,14 +1,17 @@
-SELECT
-    w.query,
-    w.queue_start_time,
-    w.service_class,
-    w.total_exec_time,
-    s.service_class,
-    s.total_exec_time AS total_exec_time_stuck,
-    s.wait_event
-FROM stl_wlm_query w
-JOIN stl_wlm_query_state s
-ON w.query = s.query
-WHERE w.status = 'Aborted'
-AND s.queue_start_time < (GETDATE() - INTERVAL '1 hour')
-AND w.pid = <Your_PID>;
+SELECT * FROM stl_wlm_query
+WHERE starttime >= '2023-10-18 12:00:00' AND endtime <= '2023-10-18 16:00:00'
+AND total_exec_time > 3600; -- This will filter queries running for more than 1 hour
+
+
+SELECT q.query, qt.querytxt
+FROM stl_wlm_query q
+JOIN stl_querytext qt ON q.query = qt.query
+WHERE q.starttime >= '2023-10-18 12:00:00' AND q.endtime <= '2023-10-18 16:00:00'
+AND q.total_exec_time > 3600; -- This will filter queries running for more than 1 hour
+
+
+
+SELECT * FROM stl_wlm_query
+WHERE starttime >= '2023-10-18 12:00:00' AND endtime <= '2023-10-18 16:00:00'
+AND total_exec_time > 3600
+AND service_class = -1; -- This shows queries that were waiting on a resource (potentially locked).
