@@ -7,6 +7,6 @@ SELECT
   a.usename AS blocked_user,
   a.current_query AS blocked_query
 FROM pg_locks l
-JOIN pg_stat_activity a ON l.transaction = a.txid
+JOIN pg_stat_activity a ON l.pid = a.procpid
 WHERE a.stl_starttime >= '2023-10-18 12:00:00' AND a.stl_starttime <= '2023-10-18 17:00:00'
-AND a.last_exec_status = 'Aborted';
+AND a.last_exec_status = 'Abort';
