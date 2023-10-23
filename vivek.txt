@@ -1,1 +1,1 @@
-=IF(COUNTIF('EDH_IT1_QA'!C:C, C2) = 0, "Yes", "No")
+=IF(COUNTIF(qa!C:C, C2) = 0, C2, "")
