@@ -1,1 +1,1 @@
-=IF(COUNTIF(qa!C:C, C2) = 0, C2, "")
+=IF(ISNUMBER(MATCH(C2, qa!C:C, 0)), "", C2)
