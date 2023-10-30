@@ -1,17 +1,33 @@
-SELECT * FROM stl_wlm_query
-WHERE starttime >= '2023-10-18 12:00:00' AND endtime <= '2023-10-18 16:00:00'
-AND total_exec_time > 3600; -- This will filter queries running for more than 1 hour
+# Set your landing directory
+landingdir="/path/to/landing/directory"
 
+# Set your email address for alerts
+EMAIL="your-email@example.com"
 
-SELECT q.query, qt.querytxt
-FROM stl_wlm_query q
-JOIN stl_querytext qt ON q.query = qt.query
-WHERE q.starttime >= '2023-10-18 12:00:00' AND q.endtime <= '2023-10-18 16:00:00'
-AND q.total_exec_time > 3600; -- This will filter queries running for more than 1 hour
+# Initialize a variable to track whether an empty file was found
+empty_file_found=0
 
+# Iterate through all files in the landing directory
+for file in "$landingdir"/*.csv; do
+  # Check if the file is empty (contains only a header row)
+  if ! [[ $(tail -n +2 "$file") ]]; then
+    # Set the flag to indicate that an empty file was found
+    empty_file_found=1
+    
+    # Extract the filename without the path
+    filename=$(basename "$file")
 
+    # Send an email alert with the filename of the empty file
+    echo "Subject: Empty File Alert" > email_content
+    echo "Empty file detected: $filename" >> email_content
+    sendmail "$EMAIL" < email_content
+    
+    # Exit the script to stop further execution after the first empty file is found
+    exit 1
+  fi
+done
 
-SELECT * FROM stl_wlm_query
-WHERE starttime >= '2023-10-18 12:00:00' AND endtime <= '2023-10-18 16:00:00'
-AND total_exec_time > 3600
-AND service_class = -1; -- This shows queries that were waiting on a resource (potentially locked).
+# Check if no empty file was found, and print a message if all files contain data
+if [ $empty_file_found -eq 0 ]; then
+  echo "No empty files found."
+fi
