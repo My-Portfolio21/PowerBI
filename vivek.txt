@@ -1,28 +1,20 @@
-# Set your email address for alerts
-EMAIL="your-email@example.com"
+# Set the path to the source directory
+SRCDIR="/datafiles/infadata/rf/salesrec/source/sterling/global/sales"
 
-# Initialize a variable to track whether an empty file was found
-empty_file_found=0
+# List all CSV files in the SRCDIR, sort them by modification time (newest first), and select the latest file
+latest_file=$(ls -t "$SRCDIR"/*.csv | head -1)
 
-# Iterate through all files in the landing directory
-for file in "$landingdir"/*.csv; do
-  # Check if the file is empty (contains only a header row)
-  if ! [[ $(tail -n +2 "$file") ]]; then
-    # Set the flag to indicate that an empty file was found
-    empty_file_found=1
-    
-    # Extract the filename without the path
-    filename=$(basename "$file")
-
-    # Send an email alert with the filename in the subject
-    echo "Subject: Empty File Alert - $filename" | sendmail "$EMAIL"
-    
-    # Exit the script to stop further execution after the first empty file is found
-    exit 1
-  fi
-done
-
-# Check if no empty file was found, and print a message if all files contain data
-if [ $empty_file_found -eq 0 ]; then
-  echo "No empty files found."
+# Check if the latest file contains only a header row
+if [[ $(tail -n +2 "$latest_file") ]]; then
+  # The latest file contains data, proceed with your script logic
+  echo "Data file found: $latest_file"
+  # Add your processing logic here
+else
+  # The latest file contains only a header row
+  echo "Empty file detected: $latest_file"
+  # Send an email alert about the empty file
+  EMAIL="your-email@example.com"
+  echo "Subject: Empty File Alert - $(basename $latest_file)" | sendmail "$EMAIL"
+  # Exit the script
+  exit 1
 fi
