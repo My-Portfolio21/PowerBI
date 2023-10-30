@@ -1,1 +1,29 @@
-=IF(A1=B1, A1, "")
+# Set your landing directory
+landingdir="/path/to/landing/directory"
+
+# Set your email address for alerts
+EMAIL="your-email@example.com"
+
+# Iterate through all files in the landing directory
+for file in "$landingdir"/*.csv; do
+  # Check if the file is empty (contains only a header row)
+  if [[ $(tail -n +2 "$file") ]]; then
+    # The file contains data, so continue processing it
+    echo "Processing file: $file"
+    
+    # Add your processing logic here
+    
+    # Move the file to the source directory (if needed)
+    # mv "$file" "$SRCDIR/"
+
+  else
+    # The file contains only a header row
+    echo "Empty file: $file"
+    
+    # Send an email alert about the empty file
+    echo "Subject: Empty File Alert" | sendmail "$EMAIL"
+    
+    # Exit the script to stop further execution
+    exit 1
+  fi
+done
